@@ -43,16 +43,22 @@ enum{
     DEAD
 };
 
+enum{
+    ATACK = 0,
+    DEFEND,
+    HEAL
+};
+
 struct atributes{
     std::string name = "null";
     int atack = 0;
-    int defense = 0;
+    float defense = 0;
     int healing = 0;
 
     int max_health = 0;
     int current_health = max_health;
     
-    std::vector<int> warrior_strategy {0, 0, 0}; // str | def | heal --> action chance
+    std::vector<int> warrior_strategy {0, 0, 0}; // atk | def | heal --> action chance
 
     char current_action;
 
@@ -114,10 +120,11 @@ class warrior{
         get_skills();
     }
 
-    void choose_action(){ // rolls dice and chooses warrior action
+    int choose_action(){ // rolls dice and chooses warrior action
         dice dice;
-
-        atr.current_action = dice.roll(dice.make_warrior_dice(atr));
+        
+        //std::cout << dice.roll(dice.make_warrior_dice(atr)) << std::endl;
+        return dice.roll(dice.make_warrior_dice(atr));
     }
 
     void atack(warrior &enemy){ // atack action
@@ -154,23 +161,39 @@ class warrior{
 
 // warrior actions
 
-enum{
-    ATACK = 0,
-    DEFEND,
-    HEAL
-};
-
 class arena{
     public:
 
     std::vector<warrior> warrior_list;
 
     void add_warriors(){
+        /*
         for(int i=0; i<2; i++){
             warrior warrior;
             warrior.get_atributes();
             warrior_list.emplace_back(warrior);
         }
+        */
+
+        warrior warrior1;
+        warrior1.atr.name = "Spartacus";
+        warrior1.atr.max_health = 40;
+        warrior1.atr.current_health = warrior1.atr.max_health;
+        warrior1.atr.atack = 5;
+        warrior1.atr.defense = 0.3;
+        warrior1.atr.healing = 10;
+        warrior1.atr.warrior_strategy = {3,2,1};
+        warrior_list.emplace_back(warrior1);
+
+        warrior warrior2;
+        warrior2.atr.name = "Flamma";
+        warrior2.atr.max_health = 35;
+        warrior2.atr.current_health = warrior2.atr.max_health;
+        warrior2.atr.atack = 10;
+        warrior2.atr.defense = 0.5;
+        warrior2.atr.healing = 15;
+        warrior2.atr.warrior_strategy = {3, 1 ,2};
+        warrior_list.emplace_back(warrior2);
     }
 
     void next_event(){
@@ -178,18 +201,19 @@ class arena{
         std::vector<int> action_sequence {0,1};
         dice.shuffle_vector(action_sequence);
 
-        warrior warrior_first = warrior_list[action_sequence[0]];
-        warrior warrior_last = warrior_list[action_sequence[1]];
 
-        for(auto warrior:warrior_list){// warriors choose an action
-            warrior.choose_action();
+        for(int i=0; i<warrior_list.size(); i++){// warriors choose an action
+            warrior_list[i].atr.current_action = warrior_list[i].choose_action();
         }
 
+        warrior warrior_first = warrior_list[action_sequence[0]];
+        warrior warrior_last = warrior_list[action_sequence[1]];
+        
         switch(warrior_first.atr.current_action){
 
             case ATACK:
                 warrior_first.atack(warrior_last);
-                warrior_first.atr.current_state = check_if_alive(warrior_last);
+                warrior_last.atr.current_state = check_if_alive(warrior_last);
                 break;
             case HEAL:
                 warrior_first.heal();
@@ -201,8 +225,16 @@ class arena{
                 break;
         }
 
-        warrior_list[action_sequence[0]] = warrior_first;
+        warrior_list[action_sequence[1]] = warrior_last;
+        
+        if(warrior_last.atr.current_state == DEAD){
+            warrior_last.atr.current_health = 0;
 
+            render(warrior_list[0], warrior_list[1]);
+
+            std::cout << warrior_first.atr.name << " " << "wins" << std::endl;
+            exit(0);
+        }
 
         switch(warrior_last.atr.current_action){
 
@@ -219,6 +251,58 @@ class arena{
             default:
                 break;
         }  
+
+        warrior_list[action_sequence[0]] = warrior_first;
+
+        if(warrior_first.atr.current_state == DEAD){
+            warrior_first.atr.current_health = 0;
+            render(warrior_list[0], warrior_list[1]);
+
+            std::cout << warrior_last.atr.name << " " << "wins" << std::endl;
+        }
+
+        render(warrior_list[0], warrior_list[1]);
+
+
+        if(warrior_first.atr.current_state == ALIVE){
+            switch(warrior_first.atr.current_action){
+                case ATACK:
+                    std::cout << warrior_first.atr.name << " attacked " << warrior_last.atr.name << std::endl;
+                    break;
+                case HEAL:
+                    std::cout<< warrior_first.atr.name << " healed his wounds " << std::endl;
+                    break;
+                case DEFEND:
+                    std::cout<< warrior_first.atr.name << " is ready to defend" << std::endl;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        else{
+            exit(0);
+        }
+        
+        if(warrior_last.atr.current_state == ALIVE){
+            switch(warrior_last.atr.current_action){
+                case ATACK:
+                    std::cout << warrior_last.atr.name << " attacked " << warrior_first.atr.name << std::endl;
+                    break;
+                case HEAL:
+                    std::cout<< warrior_last.atr.name << " healed his wounds " << std::endl;
+                    break;
+                case DEFEND:
+                    std::cout<< warrior_last.atr.name << " is ready to defend" << std::endl;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        else{
+            exit(0);
+        }
     }
 
     private:
@@ -227,16 +311,66 @@ class arena{
         if(warrior.atr.current_health <= 0){
             return DEAD;
         }
-        else if(warrior.atr.current_health > 0){
+        else{
             return ALIVE;
         }
     }
 
+    int get_biggest_name(){
+        int biggest = warrior_list[0].atr.name.size();
+        for(auto element:warrior_list){
+            if(element.atr.name.size() > biggest){
+                biggest = element.atr.name.size();
+            }
+        }
+
+        return biggest;
+    }
+
+    int get_biggest_health(){
+        int biggest = std::to_string(warrior_list[0].atr.current_health).size();
+        for(auto element:warrior_list){
+            if(std::to_string(element.atr.current_health).size() > biggest){
+               biggest = std::to_string(element.atr.current_health).size(); 
+            }
+        }
+
+        return biggest;
+    }
+
     void render(warrior warrior1, warrior warrior2){
         
-        std::cout << std::string(112, '-') << std::endl;
+        std::cout << std::string(30, '-') << std::endl;
 
+        int biggest_health = get_biggest_health();
+        int biggest_name = get_biggest_name();
+    
+        std::cout << std::left << std::setw(biggest_name+5) << "WARRIORS" 
+                  << std::setw(biggest_health+5) << "HEALTH" << std::endl;
+
+        std::cout << std::left << std::setw(biggest_name+5) << warrior1.atr.name 
+                  << std::setw(biggest_health+5) << warrior1.atr.current_health;
+
+        switch(warrior1.atr.current_state){
+            case ALIVE:
+                std::cout << std::left << std::setw(7) << "ALIVE" << std::endl; break;
+
+            case DEAD:
+                std::cout << std::left << std::setw(7) << "DEAD" << std::endl; break;
+        }
+
+        std::cout << std::left << std::setw(biggest_name+5) << warrior2.atr.name 
+                  << std::setw(biggest_health+5) << warrior2.atr.current_health;
+
+        switch(warrior2.atr.current_state){
+            case ALIVE:
+                std::cout << std::left << std::setw(7) << "ALIVE" << std::endl; break;
+
+            case DEAD:
+                std::cout << std::left << std::setw(7) << "DEAD" << std::endl; break;
+        }
         
+        std::cout << std::string(30, '-') << std::endl;
     }
 
 };
@@ -247,9 +381,8 @@ int main(){
     arena coliseum;
 
     coliseum.add_warriors();
-
-    for(auto element:coliseum.warrior_list){
-        std::cout << element.atr.name << std::endl;
+    while(true){
+        coliseum.next_event();
     }
 
     return 0;
